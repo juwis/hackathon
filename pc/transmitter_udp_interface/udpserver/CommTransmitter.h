@@ -1,10 +1,12 @@
 #pragma once
 #include <map>
+#include <vector>
 #include <list>
 #include <chrono>
 #include <inttypes.h>
+#include <thread>
 
-#include "PracticalSocket.h" // For UDPSocket and SocketException
+#include "PracticalSocket.hpp" // For UDPSocket and SocketException
 
 #ifdef __GNUC__
 #define PACKED( class_to_pack ) class_to_pack __attribute__((__packed__))
@@ -58,25 +60,35 @@ public:
 };
 
 
-class CommTransmitter{
+class CommTransmitter {
 private:
+	CommTransmitter::CommTransmitter();
+
 	map <string, Transmitter> connected_transmitters; //ipaddress is key
-	list <TransmitterOverride> transmitter_override_queue;
+	vector<string> indexed_transmitters;
+	std::list <TransmitterOverride> transmitter_override_queue;
 	s_transmitter_state_packet ts_packet;
 	unsigned short listen_port;
 	bool running, stop;
 	UDPSocket *sock;
 	unsigned long monotonic_counter; //as stated, strictly monotonic for transmitter identification
+	thread th;
 
 	void CommTransmitter::cleanup_transmitter_list();
 
+	static CommTransmitter* _pInstance;
 
 public:
-	CommTransmitter::CommTransmitter(unsigned short listen_port);
+
+	CommTransmitter::CommTransmitter(const CommTransmitter&) = delete;
+
+	static CommTransmitter& _getInstance();
+
+	static void _destroyInstance();
 
 	CommTransmitter::~CommTransmitter();
 
-	list<string> CommTransmitter::get_connected_transmitter_ips();
+	std::list<string> CommTransmitter::get_connected_transmitter_ips();
 
 	const int CommTransmitter::set_override_out_throttle(string transmitter_ip, unsigned short new_throttle);
 
@@ -91,6 +103,20 @@ public:
 	const int CommTransmitter::get_in_steer(string transmitter_ip);
 
 	const int CommTransmitter::get_in_throttle(string transmitter_ip);
+
+	const int CommTransmitter::set_override_out_throttle_by_id(int transmitterId, int new_throttle);
+
+	const int CommTransmitter::set_override_out_steer_by_id(int transmitterId, int new_steer);
+
+	const int CommTransmitter::set_override_out_both_by_id(int transmitterId, int new_steer, int new_throttle);
+
+	const int CommTransmitter::get_out_throttle_by_id(int transmitterId);
+
+	const int CommTransmitter::get_out_steer_by_id(int transmitterId);
+
+	const int CommTransmitter::get_in_steer_by_id(int transmitterId);
+
+	const int CommTransmitter::get_in_throttle_by_id(int transmitterId);
 
 	void CommTransmitter::run();
 

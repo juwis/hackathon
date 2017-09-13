@@ -1,16 +1,16 @@
 #include "CommTransmitter.h"
 
-#include "PracticalSocket.h" // For UDPSocket and SocketException
+#include "PracticalSocket.hpp" // For UDPSocket and SocketException
 #include <iostream>          // For cout and cerr
 
 #include <inttypes.h>
-#include "Crc32.h"
+#include "Crc32.hpp"
 #include <string>
 #include <chrono>
 #include <map>
 #include <list>
 #include <process.h>
-#include <thread>
+
 
 using namespace std;
 
@@ -21,19 +21,34 @@ using namespace std;
 #define TRANSMITTER_DELETE_AGE_MS	10000
 #define TRANSMITTER_DISABLE_AGE_MS	2500
 
+CommTransmitter* CommTransmitter::_pInstance = NULL;
 
-CommTransmitter::CommTransmitter(unsigned short listen_port){
-	this->monotonic_counter = 0;
-	this->running = false;
-	this->stop = true;
-	this->listen_port = listen_port;
-	this->sock = new UDPSocket(this->listen_port);
+CommTransmitter& CommTransmitter::_getInstance(){
+	if (NULL == _pInstance){
+		_pInstance = new CommTransmitter();
+	}
+	return *_pInstance;
+}
+
+void CommTransmitter::_destroyInstance(){
+	delete _pInstance;
+	_pInstance = NULL;
+}
+
+CommTransmitter::CommTransmitter():
+	monotonic_counter(0),
+	running(false),
+	stop(true),
+	listen_port(LISTEN_PORT),
+	sock(new UDPSocket(this->listen_port)),
+	th(thread(&CommTransmitter::run, this)){
 
 }
 
 CommTransmitter::~CommTransmitter(){
 	delete this->sock;
 }
+
 
 list<string> CommTransmitter::get_connected_transmitter_ips(){
 	list<string> connected_transmitter_ips;
@@ -140,6 +155,36 @@ const int CommTransmitter::get_in_throttle(string transmitter_ip){
 	return -1;
 }
 
+
+const int CommTransmitter::set_override_out_throttle_by_id(int transmitterId, int new_throttle){
+	return this->set_override_out_throttle(indexed_transmitters[transmitterId], new_throttle);
+}
+
+const int CommTransmitter::set_override_out_steer_by_id(int transmitterId, int new_steer){
+	return this->set_override_out_steer(indexed_transmitters[transmitterId], new_steer);
+}
+
+const int CommTransmitter::set_override_out_both_by_id(int transmitterId, int new_steer, int new_throttle){
+	return this->set_override_out_both(indexed_transmitters[transmitterId], new_steer, new_throttle);
+}
+
+const int CommTransmitter::get_out_throttle_by_id(int transmitterId){
+	return this->get_out_throttle(indexed_transmitters[transmitterId]);
+}
+
+const int CommTransmitter::get_out_steer_by_id(int transmitterId){
+	return this->get_out_steer(indexed_transmitters[transmitterId]);
+}
+
+const int CommTransmitter::get_in_steer_by_id(int transmitterId){
+	return this->get_in_steer(indexed_transmitters[transmitterId]);
+}
+
+const int CommTransmitter::get_in_throttle_by_id(int transmitterId){
+	return this->get_in_throttle(indexed_transmitters[transmitterId]);
+}
+
+
 void CommTransmitter::cleanup_transmitter_list(){
 	std::chrono::duration<double, std::nano> update_age;
 
@@ -157,12 +202,13 @@ void CommTransmitter::cleanup_transmitter_list(){
 			ct_iter->second.alive = false;
 		}
 	}
+	indexed_transmitters.clear();
 }
 
 void CommTransmitter::run(){
 	chrono::system_clock::time_point  start = chrono::high_resolution_clock::now();
 	std::chrono::duration<double, std::nano> duration;
-	unsigned int count = 0;
+
 	unsigned int crc;
 	int recvMsgSize;                  // Size of received message
 	string source_address;             // Address of datagram source
@@ -191,16 +237,13 @@ void CommTransmitter::run(){
 
 				//in case this transmitter was sensed dead we set him back to alive
 				my_transmitter.alive = true;
-				//cout << my_transmitter.ip_address << ":" << (unsigned int)my_transmitter.ts_packet.in_steer << ":" << (unsigned int)my_transmitter.ts_packet.in_throttle << ":" << (unsigned int)my_transmitter.ts_packet.out_steer << ":" << (unsigned int)my_transmitter.ts_packet.out_throttle << endl;
-				count++;
-				if (count > 5){
-					this->set_override_out_both(my_transmitter.ip_address, my_transmitter.ts_packet.in_steer, my_transmitter.ts_packet.in_throttle);
-					count = 0;
-				}
+				cout << my_transmitter.ip_address << ":" << (unsigned int)my_transmitter.ts_packet.in_steer << ":" << (unsigned int)my_transmitter.ts_packet.in_throttle << ":" << (unsigned int)my_transmitter.ts_packet.out_steer << ":" << (unsigned int)my_transmitter.ts_packet.out_throttle << endl;
+				this->set_override_out_both(my_transmitter.ip_address, 0, 0);//my_transmitter.ts_packet.in_steer, my_transmitter.ts_packet.in_throttle);
 			}
 			else{
 				//new transmitter showed up, add to list and create convinience pointer
 				Transmitter &my_transmitter(this->connected_transmitters[source_address]);
+				indexed_transmitters.push_back(source_address);
 				//set update time for cleanup
 				my_transmitter.last_packet_received = chrono::steady_clock::now();
 
@@ -220,14 +263,14 @@ void CommTransmitter::run(){
 			if (!this->transmitter_override_queue.empty()){
 				//override queue has stuff to do...
 				TransmitterOverride &my_t_O(this->transmitter_override_queue.front());
-				my_t_O.ts_ct_packet.CRC = crc32_fast(&my_t_O.ts_ct_packet, sizeof(s_transmitter_control_packet) - 4);
-				
+				crc = crc32_fast(&my_t_O.ts_ct_packet, sizeof(s_transmitter_control_packet) - 4);
+				my_t_O.ts_ct_packet.CRC = crc;
 				this->sock->sendTo(&my_t_O.ts_ct_packet, sizeof(s_transmitter_control_packet), my_t_O.ip_address, TRANSMITTER_PORT);
-				cout << (unsigned short)my_t_O.ts_ct_packet.out_steer << ":" << (unsigned short)my_t_O.ts_ct_packet.out_throttle << "(" << my_t_O.ts_ct_packet.CRC << ")" << endl;
 				this->transmitter_override_queue.pop_front();
 			}
 			//cout << "Received packet from " << source_address << ":" << source_port << endl;
 			//cout << ts_packet.in_steer << " : " << ts_packet.in_throttle << " : " << ts_packet.out_steer << " : " << ts_packet.out_throttle << endl;
+			this_thread::sleep_for(std::chrono::milliseconds(1));
 		}
 	}
 }
