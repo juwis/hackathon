@@ -192,11 +192,11 @@ void CommTransmitter::run(){
 				//in case this transmitter was sensed dead we set him back to alive
 				my_transmitter.alive = true;
 				//cout << my_transmitter.ip_address << ":" << (unsigned int)my_transmitter.ts_packet.in_steer << ":" << (unsigned int)my_transmitter.ts_packet.in_throttle << ":" << (unsigned int)my_transmitter.ts_packet.out_steer << ":" << (unsigned int)my_transmitter.ts_packet.out_throttle << endl;
-				count++;
-				if (count > 5){
-					this->set_override_out_both(my_transmitter.ip_address, my_transmitter.ts_packet.in_steer, my_transmitter.ts_packet.in_throttle);
-					count = 0;
-				}
+				//count++;
+				//if (count > 5){
+				//	this->set_override_out_both(my_transmitter.ip_address, 255 - my_transmitter.ts_packet.in_steer, 255 - my_transmitter.ts_packet.in_throttle);
+				//	count = 0;
+				//}
 			}
 			else{
 				//new transmitter showed up, add to list and create convinience pointer
