@@ -34,7 +34,7 @@ int main(int argc, char *argv[]) {
 
 
 
-	CommTransmitter myTransmitter(3333);
+	CommTransmitter &myTransmitter(CommTransmitter::_getInstance());
 	// enqueue and store future
 	std::future<void> result;
 	result = pool.enqueue([&myTransmitter]() {

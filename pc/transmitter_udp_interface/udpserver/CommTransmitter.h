@@ -104,20 +104,6 @@ public:
 
 	const int CommTransmitter::get_in_throttle(string transmitter_ip);
 
-	const int CommTransmitter::set_override_out_throttle_by_id(int transmitterId, int new_throttle);
-
-	const int CommTransmitter::set_override_out_steer_by_id(int transmitterId, int new_steer);
-
-	const int CommTransmitter::set_override_out_both_by_id(int transmitterId, int new_steer, int new_throttle);
-
-	const int CommTransmitter::get_out_throttle_by_id(int transmitterId);
-
-	const int CommTransmitter::get_out_steer_by_id(int transmitterId);
-
-	const int CommTransmitter::get_in_steer_by_id(int transmitterId);
-
-	const int CommTransmitter::get_in_throttle_by_id(int transmitterId);
-
 	void CommTransmitter::run();
 
 
