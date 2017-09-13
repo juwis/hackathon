@@ -220,6 +220,21 @@ void CommTransmitter::run(){
 			if (!this->transmitter_override_queue.empty()){
 				//override queue has stuff to do...
 				TransmitterOverride &my_t_O(this->transmitter_override_queue.front());
+				
+				//check whether steering or throttle shall NOT be overridden - replace the unset value with the last read live value
+				if (my_t_O.override_steer == false){
+					//it is IN_STEER - NOT OUT_STEER - elsewise we would fix up the last sent value!!!
+					//in_steer is the value read from the ADC, out_steer would be the value we sent now and from there on to forever...
+					//if you don't understand this, ask. 
+					my_t_O.ts_ct_packet.out_steer = this->get_in_steer(my_t_O.ip_address);
+				}
+				//...
+				if (my_t_O.override_steer == false){
+					//as above with steer, use tha transmitters IN value
+					//if you don't understand this, ask. 
+					my_t_O.ts_ct_packet.out_throttle = this->get_in_throttle(my_t_O.ip_address);
+				}
+
 				my_t_O.ts_ct_packet.CRC = crc32_fast(&my_t_O.ts_ct_packet, sizeof(s_transmitter_control_packet) - 4);
 				
 				this->sock->sendTo(&my_t_O.ts_ct_packet, sizeof(s_transmitter_control_packet), my_t_O.ip_address, TRANSMITTER_PORT);
