@@ -13,6 +13,8 @@
 #endif
 
 
+
+//network packet sent from transmitter to server with live data
 PACKED(
 struct s_transmitter_state_packet{
 	uint8_t in_throttle;
@@ -23,7 +25,7 @@ struct s_transmitter_state_packet{
 };
 );
 
-
+//network packet sent from server to transmitter with override data
 PACKED(
 struct s_transmitter_control_packet{
 	uint8_t out_throttle;
@@ -61,7 +63,7 @@ public:
 class CommTransmitter{
 private:
 	map <string, Transmitter> connected_transmitters; //ipaddress is key
-	list <TransmitterOverride> transmitter_override_queue;
+	list <TransmitterOverride> transmitter_override_queue; //every setter call creates a packet that is worked after receiving a new packet
 	s_transmitter_state_packet ts_packet;
 	unsigned short listen_port;
 	bool running, stop;
@@ -93,6 +95,5 @@ public:
 	const int CommTransmitter::get_in_throttle(string transmitter_ip);
 
 	void CommTransmitter::run();
-
 
 };
