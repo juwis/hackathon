@@ -20,16 +20,33 @@
 #include <iostream>          // For cout and cerr
 #include <string>
 
+
 #include "CommTransmitter.h"
+#include "threadpool.h"
+
+
 
 int main(int argc, char *argv[]) {
 
+	// create thread pool with 4 worker threads
+	ThreadPool pool(4);
+
+
+
+
 	CommTransmitter myTransmitter(3333);
-	myTransmitter.run();
-/*
+	// enqueue and store future
+	std::future<void> result;
+	result = pool.enqueue([&myTransmitter]() {
+		myTransmitter.run();
+	});
+	uint8_t new_steer = 0;
 	while (true){
-		cout << "get_out_steer: " << myTransmitter.get_out_steer("192.168.0.100") << endl;
-	}*/
+
+		cout << "get_in_steer: " << myTransmitter.get_in_steer("192.168.0.100") << endl;
+		cout << "get_in_throttle: " << myTransmitter.get_in_throttle("192.168.0.100") << endl;
+		_sleep(5);
+	}
 
 	return 0;
 }

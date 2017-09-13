@@ -79,6 +79,7 @@
     <ClInclude Include="CommTransmitter.h" />
     <ClInclude Include="Crc32.h" />
     <ClInclude Include="PracticalSocket.h" />
+    <ClInclude Include="threadpool.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="CommTransmitter.cpp" />

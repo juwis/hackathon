@@ -9,10 +9,11 @@
 #include <chrono>
 #include <map>
 #include <list>
-#include <process.h>
-#include <thread>
+#include <mutex>
 
 using namespace std;
+
+mutex queue_mutex;
 
 #define LISTEN_PORT		3333
 
@@ -37,14 +38,18 @@ CommTransmitter::~CommTransmitter(){
 
 list<string> CommTransmitter::get_connected_transmitter_ips(){
 	list<string> connected_transmitter_ips;
+	queue_mutex.lock();
 	for (map <string, Transmitter>::iterator ct_iter = this->connected_transmitters.begin(); ct_iter != this->connected_transmitters.end(); ct_iter++){
 		connected_transmitter_ips.push_back(ct_iter->first);
 	}
+	queue_mutex.unlock();
 	return connected_transmitter_ips;
 }
 
 const int CommTransmitter::set_override_out_both(string transmitter_ip, unsigned short new_steer, unsigned short new_throttle){
 	//adds a override packet to the queue
+	queue_mutex.lock();
+
 	if (this->connected_transmitters.find(transmitter_ip) != this->connected_transmitters.end()){
 		if (this->connected_transmitters[transmitter_ip].alive){
 			//new override request
@@ -56,15 +61,19 @@ const int CommTransmitter::set_override_out_both(string transmitter_ip, unsigned
 			my_t_o.ts_ct_packet.out_steer = new_steer;
 			my_t_o.ts_ct_packet.out_throttle = new_throttle;
 			this->transmitter_override_queue.push_back(my_t_o);
+			queue_mutex.unlock();
 			return 0;
 		}
 	}
 	//not found...
+	queue_mutex.unlock();
 	return -1;
 }
 
 const int CommTransmitter::set_override_out_steer(string transmitter_ip, unsigned short new_steer){
 	//adds a override packet to the queue
+	queue_mutex.lock();
+
 	if (this->connected_transmitters.find(transmitter_ip) != this->connected_transmitters.end()){
 		if (this->connected_transmitters[transmitter_ip].alive){
 			//new override request
@@ -74,16 +83,19 @@ const int CommTransmitter::set_override_out_steer(string transmitter_ip, unsigne
 			my_t_o.ip_address = transmitter_ip;
 			my_t_o.ts_ct_packet.out_steer = new_steer;
 			this->transmitter_override_queue.push_back(my_t_o);
+			queue_mutex.unlock();
 			return 0;
 		}
 	}
 	//not found...
+	queue_mutex.unlock();
 	return -1;
 }
 
 
 const int CommTransmitter::set_override_out_throttle(string transmitter_ip, unsigned short new_throttle){
 	//adds a override packet to the queue
+	queue_mutex.lock();
 	if (this->connected_transmitters.find(transmitter_ip) != this->connected_transmitters.end()){
 		if (this->connected_transmitters[transmitter_ip].alive){
 			//new override request
@@ -93,55 +105,72 @@ const int CommTransmitter::set_override_out_throttle(string transmitter_ip, unsi
 			my_t_o.ip_address = transmitter_ip;
 			my_t_o.ts_ct_packet.out_throttle = new_throttle;
 			this->transmitter_override_queue.push_back(my_t_o);
+			queue_mutex.unlock();
 			return 0;
 		}
 	}
 	//not found...
+	queue_mutex.unlock();
 	return -1;
 }
 
 const int CommTransmitter::get_out_throttle(string transmitter_ip){
+	queue_mutex.lock();
 	if (this->connected_transmitters.find(transmitter_ip) != this->connected_transmitters.end()){
 		if (this->connected_transmitters[transmitter_ip].alive){
-			return this->connected_transmitters[transmitter_ip].ts_packet.out_throttle;
+			int result = this->connected_transmitters[transmitter_ip].ts_packet.out_throttle;
+			queue_mutex.unlock();
+			return result;
 		}
 	}
 	//not found...
+	queue_mutex.unlock();
 	return -1;
 }
 
 const int CommTransmitter::get_out_steer(string transmitter_ip){
+	queue_mutex.lock();
 	if (this->connected_transmitters.find(transmitter_ip) != this->connected_transmitters.end()){
 		if (this->connected_transmitters[transmitter_ip].alive){
-			return this->connected_transmitters[transmitter_ip].ts_packet.out_steer;
+			int result = this->connected_transmitters[transmitter_ip].ts_packet.out_steer;
+			queue_mutex.unlock();
+			return result;
 		}
 	}
 	//not found...
-	return -1;
 }
 
 const int CommTransmitter::get_in_steer(string transmitter_ip){
+	queue_mutex.lock();
 	if (this->connected_transmitters.find(transmitter_ip) != this->connected_transmitters.end()){
 		if (this->connected_transmitters[transmitter_ip].alive){
-			return this->connected_transmitters[transmitter_ip].ts_packet.in_steer;
+			int result = this->connected_transmitters[transmitter_ip].ts_packet.in_steer;
+			queue_mutex.unlock();
+			return result;
 		}
 	}
 	//not found...
+	queue_mutex.unlock();
 	return -1;
 }
 
 const int CommTransmitter::get_in_throttle(string transmitter_ip){
+	queue_mutex.lock();
 	if (this->connected_transmitters.find(transmitter_ip) != this->connected_transmitters.end()){
 		if (this->connected_transmitters[transmitter_ip].alive){
-			return this->connected_transmitters[transmitter_ip].ts_packet.in_throttle;
+			int result = this->connected_transmitters[transmitter_ip].ts_packet.in_throttle;
+			queue_mutex.unlock();
+			return result;
 		}
 	}
 	//not found...
+	queue_mutex.unlock();
 	return -1;
 }
 
 void CommTransmitter::cleanup_transmitter_list(){
 	std::chrono::duration<double, std::nano> update_age;
+	queue_mutex.lock();
 
 	for (map <string, Transmitter>::iterator ct_iter = this->connected_transmitters.begin(); ct_iter != this->connected_transmitters.end(); ct_iter++){
 		update_age = ct_iter->second.last_packet_received - chrono::high_resolution_clock::now();
@@ -157,6 +186,8 @@ void CommTransmitter::cleanup_transmitter_list(){
 			ct_iter->second.alive = false;
 		}
 	}
+
+	queue_mutex.unlock();
 }
 
 void CommTransmitter::run(){
@@ -179,6 +210,8 @@ void CommTransmitter::run(){
 		crc = crc32_fast(&this->ts_packet, sizeof(s_transmitter_state_packet) - 4);
 		if (crc == this->ts_packet.CRC){
 			//cout << crc << ":" << this->ts_packet.CRC << endl;
+			queue_mutex.lock();
+
 			if (this->connected_transmitters.find(source_address) != this->connected_transmitters.end()){
 				//already enlisted, update
 				Transmitter &my_transmitter(this->connected_transmitters[source_address]);
@@ -192,11 +225,7 @@ void CommTransmitter::run(){
 				//in case this transmitter was sensed dead we set him back to alive
 				my_transmitter.alive = true;
 				//cout << my_transmitter.ip_address << ":" << (unsigned int)my_transmitter.ts_packet.in_steer << ":" << (unsigned int)my_transmitter.ts_packet.in_throttle << ":" << (unsigned int)my_transmitter.ts_packet.out_steer << ":" << (unsigned int)my_transmitter.ts_packet.out_throttle << endl;
-				count++;
-				if (count > 5){
-					this->set_override_out_both(my_transmitter.ip_address, my_transmitter.ts_packet.in_steer, my_transmitter.ts_packet.in_throttle);
-					count = 0;
-				}
+
 			}
 			else{
 				//new transmitter showed up, add to list and create convinience pointer
@@ -220,12 +249,31 @@ void CommTransmitter::run(){
 			if (!this->transmitter_override_queue.empty()){
 				//override queue has stuff to do...
 				TransmitterOverride &my_t_O(this->transmitter_override_queue.front());
+				
+				//check whether steering or throttle shall NOT be overridden - replace the unset value with the last read live value
+				if (my_t_O.override_steer == false){
+					//it is IN_STEER - NOT OUT_STEER - elsewise we would fix up the last sent value!!!
+					//in_steer is the value read from the ADC, out_steer would be the value we sent now and from there on to forever...
+					//if you don't understand this, ask. 
+					my_t_O.ts_ct_packet.out_steer = this->connected_transmitters[my_t_O.ip_address].ts_packet.in_steer;
+				}
+				//...
+				if (my_t_O.override_throttle == false){
+					//as above with steer, use tha transmitters IN value
+					//if you don't understand this, ask. 
+					my_t_O.ts_ct_packet.out_throttle = this->connected_transmitters[my_t_O.ip_address].ts_packet.in_throttle;
+				}
+
 				my_t_O.ts_ct_packet.CRC = crc32_fast(&my_t_O.ts_ct_packet, sizeof(s_transmitter_control_packet) - 4);
 				
 				this->sock->sendTo(&my_t_O.ts_ct_packet, sizeof(s_transmitter_control_packet), my_t_O.ip_address, TRANSMITTER_PORT);
-				cout << (unsigned short)my_t_O.ts_ct_packet.out_steer << ":" << (unsigned short)my_t_O.ts_ct_packet.out_throttle << "(" << my_t_O.ts_ct_packet.CRC << ")" << endl;
+				//cout << (unsigned short)my_t_O.ts_ct_packet.out_steer << ":" << (unsigned short)my_t_O.ts_ct_packet.out_throttle << "(" << my_t_O.ts_ct_packet.CRC << ")" << endl;
 				this->transmitter_override_queue.pop_front();
+
+
 			}
+
+			queue_mutex.unlock();
 			//cout << "Received packet from " << source_address << ":" << source_port << endl;
 			//cout << ts_packet.in_steer << " : " << ts_packet.in_throttle << " : " << ts_packet.out_steer << " : " << ts_packet.out_throttle << endl;
 		}
