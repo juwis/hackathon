@@ -22,13 +22,27 @@ mutex queue_mutex;
 #define TRANSMITTER_DELETE_AGE_MS	10000
 #define TRANSMITTER_DISABLE_AGE_MS	2500
 
+CommTransmitter* CommTransmitter::_pInstance = NULL;
 
-CommTransmitter::CommTransmitter(unsigned short listen_port){
-	this->monotonic_counter = 0;
-	this->running = false;
-	this->stop = true;
-	this->listen_port = listen_port;
-	this->sock = new UDPSocket(this->listen_port);
+CommTransmitter& CommTransmitter::_getInstance(){
+	if (NULL == _pInstance){
+		_pInstance = new CommTransmitter();
+	}
+	return *_pInstance;
+}
+
+void CommTransmitter::_destroyInstance(){
+	delete _pInstance;
+	_pInstance = NULL;
+}
+
+CommTransmitter::CommTransmitter():
+	monotonic_counter(0),
+	running(false),
+	stop(true),
+	listen_port(LISTEN_PORT),
+	sock(new UDPSocket(this->listen_port)),
+	th(thread(&CommTransmitter::run, this)){
 
 }
 
@@ -138,6 +152,7 @@ const int CommTransmitter::get_out_steer(string transmitter_ip){
 		}
 	}
 	//not found...
+	return -1;
 }
 
 const int CommTransmitter::get_in_steer(string transmitter_ip){
@@ -167,6 +182,36 @@ const int CommTransmitter::get_in_throttle(string transmitter_ip){
 	queue_mutex.unlock();
 	return -1;
 }
+
+
+const int CommTransmitter::set_override_out_throttle_by_id(int transmitterId, int new_throttle){
+	return this->set_override_out_throttle(indexed_transmitters[transmitterId], new_throttle);
+}
+
+const int CommTransmitter::set_override_out_steer_by_id(int transmitterId, int new_steer){
+	return this->set_override_out_steer(indexed_transmitters[transmitterId], new_steer);
+}
+
+const int CommTransmitter::set_override_out_both_by_id(int transmitterId, int new_steer, int new_throttle){
+	return this->set_override_out_both(indexed_transmitters[transmitterId], new_steer, new_throttle);
+}
+
+const int CommTransmitter::get_out_throttle_by_id(int transmitterId){
+	return this->get_out_throttle(indexed_transmitters[transmitterId]);
+}
+
+const int CommTransmitter::get_out_steer_by_id(int transmitterId){
+	return this->get_out_steer(indexed_transmitters[transmitterId]);
+}
+
+const int CommTransmitter::get_in_steer_by_id(int transmitterId){
+	return this->get_in_steer(indexed_transmitters[transmitterId]);
+}
+
+const int CommTransmitter::get_in_throttle_by_id(int transmitterId){
+	return this->get_in_throttle(indexed_transmitters[transmitterId]);
+}
+
 
 void CommTransmitter::cleanup_transmitter_list(){
 	std::chrono::duration<double, std::nano> update_age;
