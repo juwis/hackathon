@@ -9,6 +9,8 @@
 #ifndef __DEFINES__H
 #define __DEFINES__H
 
+#include <inttypes.h>
+
 //IO pin mapping - DO NOT CHANGE until you really know what you do...
 #define THROTTLE_SENSE_PIN			35
 #define THROTTLE_CONTROL_PIN		26
@@ -27,6 +29,11 @@
 #define STEER_MIN_OUT		0
 #define STEER_CNT_OUT		64
 #define STEER_MAX_OUT		128
+
+//normalized values
+#define NORMALIZED_MIN_OUT		0
+#define NORMALIZED_CNT_OUT		UINT8_MAX / 2
+#define NORMALIZED_MAX_OUT		UINT8_MAX
 
 //low pass filter fraction, (1/FILTER_FRACTION) of the new ADC value is accounted for in the new value
 #define	FILTER_FRACTION		2.0

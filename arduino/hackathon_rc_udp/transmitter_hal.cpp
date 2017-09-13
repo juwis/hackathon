@@ -58,10 +58,17 @@ void TASK_transmitter_hal_run(void *param){
 	//...and steering, three point linear interpolation
 	uint16_t map_steer_in[MAP_SIZE];
 	uint16_t map_steer_out[MAP_SIZE] = { STEER_MIN_OUT, STEER_CNT_OUT, STEER_MAX_OUT };
+	uint16_t map_normalized[MAP_SIZE] = { NORMALIZED_MIN_OUT, NORMALIZED_CNT_OUT, NORMALIZED_MAX_OUT };
 
 	//ADC Values read and filtered are put into theese
 	uint16_t in_throttle = 0;
 	uint16_t in_steer = 0;
+	//normalized to uint8_t
+	uint8_t normalized_in_steer = NORMALIZED_CNT_OUT;
+	uint8_t normalized_in_throttle = NORMALIZED_CNT_OUT;
+	uint8_t normalized_override_steer = NORMALIZED_CNT_OUT;
+	uint8_t normalized_override_throttle = NORMALIZED_CNT_OUT;
+
 	uint16_t min_throttle = UINT16_MAX;
 	uint16_t max_throttle = 0;
 	uint16_t min_steer = UINT16_MAX;
@@ -152,37 +159,46 @@ void TASK_transmitter_hal_run(void *param){
 
 		if (calibrated){
 			//live updates from finished calibration on...
+			
+			//linear mapping of input values, based on three point LUT
+			normalized_in_steer = multiMap(in_steer, map_steer_in, map_normalized, MAP_SIZE);
+			normalized_in_throttle = multiMap(in_throttle, map_throttle_in, map_normalized, MAP_SIZE);
 
 			//first check if we need to overwrite the output
 			//is semaphore ready & packet not too old
+
 			if (
 				transmitter_output_override.ready == true
 				&& transmitter_output_override.millis_last_update + OVERWRITE_PACKAGE_VALID_MS > millis()
 				){
+				//A live packet from master is here, override output
 				//replace values by master values
-				//inverse map from 0-255 linear to real dac values (both values)
-				out_steer = transmitter_output_override.out_steer;//map(transmitter_output_override.out_steer, 0, 255, STEER_MIN_OUT, STEER_MAX_OUT);
-				out_throttle = map(transmitter_output_override.out_throttle, 0, 255, THROTTLE_MIN_OUT, THROTTLE_MAX_OUT);
-
+				normalized_override_steer = transmitter_output_override.out_steer;
+				normalized_override_throttle = map(transmitter_output_override.out_throttle, 0, 255, THROTTLE_MIN_OUT, THROTTLE_MAX_OUT);
+				
+				//de-normalize values to real out values
+				out_steer = multiMap(normalized_override_steer, map_normalized, map_steer_out, MAP_SIZE);
+				out_throttle = multiMap(normalized_override_throttle, map_normalized, map_throttle_out, MAP_SIZE);
 			}
 			else{
-				//linear mapping of input to output values, based on three point LUT
-				out_steer = multiMap(in_steer, map_steer_in, map_steer_out, MAP_SIZE);
-				out_throttle = multiMap(in_throttle, map_throttle_in, map_throttle_out, MAP_SIZE);
+				//use the Transmitters ADC values for controlling the car
+				//de-normalize ADC values to real out values
+				out_steer = multiMap(normalized_in_steer, map_normalized, map_steer_out, MAP_SIZE);
+				out_throttle = multiMap(normalized_in_throttle, map_normalized, map_throttle_out, MAP_SIZE);
 			}
+
 			//update global transmitter state
-			transmitter_state.in_steer = multiMap(in_steer, map_steer_in, map_steer_out, MAP_SIZE);
-			transmitter_state.in_throttle = multiMap(in_throttle, map_throttle_in, map_throttle_out, MAP_SIZE);
+			transmitter_state.in_steer = normalized_in_steer;
+			transmitter_state.in_throttle = normalized_in_throttle;
 			transmitter_state.out_steer = out_steer;
 			transmitter_state.out_throttle = out_throttle;
-
-
 		}
 
 		if (last_millis + 1000 < millis()){
 			last_millis = millis();
 			printf("in_steer: %d;in_throttle %d;out_steer: %d; out_throttle: %d\r\n", transmitter_state.in_steer, transmitter_state.in_throttle, transmitter_state.out_steer, transmitter_state.out_throttle);
 		}
+
 
 		dacWrite(STEERING_CONTROL_PIN, transmitter_state.out_steer);
 		dacWrite(THROTTLE_CONTROL_PIN, transmitter_state.out_throttle);
