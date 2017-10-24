@@ -18,10 +18,12 @@
 struct s_transmitter_state_packet{
 	uint8_t in_throttle;
 	uint8_t in_steer;
+	uint16_t in_button;
 	uint8_t out_throttle;
 	uint8_t out_steer;
+	uint16_t battery_voltage;
 	uint32_t CRC;
-}ts_packet;
+}ts_packet __attribute__((packed));
 
 //updates from master
 volatile s_transmitter_override transmitter_output_override;
@@ -46,7 +48,7 @@ void TASK_comm_run(void *param);
 
 void wifi_event(WiFiEvent_t event){
 	switch (event) {
-	case SYSTEM_EVENT_STA_GOT_IP:
+	case SYSTEM_EVENT_STA_CONNECTED:
 		connected = true;
 		break;
 	case SYSTEM_EVENT_STA_DISCONNECTED:
@@ -64,6 +66,7 @@ void wifi_connect(){
 	//listen for incoming packets
 	udp.begin(listen_port);
 	//Initiate connection
+	WiFi.config(IPAddress(192, 168, 0, 103), IPAddress(192, 168, 0, 172), IPAddress(255, 255, 255, 0));
 	WiFi.begin(station_ssid, station_pwd);
 
 }
@@ -105,6 +108,7 @@ int init_comm(const char * ssid, const char * pwd, const char *server_ip, uint16
 void TASK_comm_run(void *param){
 	int packet_size = 0;
 	uint64_t last_send_packet_millis = millis();
+	uint64_t last_millis = millis();
 
 	while (true){
 
@@ -172,9 +176,8 @@ void TASK_comm_run(void *param){
 			}
 		}
 
-
-		//release task focus for scheduler, delay for 1ms
 		vTaskDelay(portTICK_PERIOD_MS);
+
 	}
 	//unreachable!
 

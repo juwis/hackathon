@@ -19,8 +19,8 @@ mutex queue_mutex;
 
 #define TRANSMITTER_PORT		31337
 
-#define TRANSMITTER_DELETE_AGE_MS	10000
-#define TRANSMITTER_DISABLE_AGE_MS	2500
+#define TRANSMITTER_DELETE_AGE_MS	10
+#define TRANSMITTER_DISABLE_AGE_MS	3
 
 CommTransmitter* CommTransmitter::_pInstance = NULL;
 
@@ -190,6 +190,7 @@ void CommTransmitter::cleanup_transmitter_list(){
 
 	for (map <string, Transmitter>::iterator ct_iter = this->connected_transmitters.begin(); ct_iter != this->connected_transmitters.end(); ct_iter++){
 		update_age = ct_iter->second.last_packet_received - chrono::high_resolution_clock::now();
+		//cout << update_age.count() << endl;
 		if (update_age.count() > TRANSMITTER_DELETE_AGE_MS){
 			cout << "removing transmitter with IP: " << ct_iter->second.ip_address << endl;
 			this->connected_transmitters.erase(ct_iter->second.ip_address);
@@ -217,12 +218,18 @@ void CommTransmitter::run(){
 	this->stop = false;
 
 	while (!this->stop){
+		cout << "Hallo" << endl;
 		this->running = true;
 		this->cleanup_transmitter_list();
 
 		duration = start - chrono::high_resolution_clock::now();
-
-		recvMsgSize = this->sock->recvFrom(&this->ts_packet, sizeof(s_transmitter_state_packet), source_address, source_port);
+		try{
+			recvMsgSize = this->sock->recvFrom(&this->ts_packet, sizeof(s_transmitter_state_packet), source_address, source_port);
+		}
+		catch (exception ex){
+			cout << ex.what() << endl;
+			continue;
+		}
 		crc = crc32_fast(&this->ts_packet, sizeof(s_transmitter_state_packet) - 4);
 		if (crc == this->ts_packet.CRC){
 			//cout << crc << ":" << this->ts_packet.CRC << endl;
@@ -290,7 +297,7 @@ void CommTransmitter::run(){
 			}
 
 			queue_mutex.unlock();
-			//cout << "Received packet from " << source_address << ":" << source_port << endl;
+			cout << "Received packet from " << source_address << ":" << source_port << endl;
 			//cout << ts_packet.in_steer << " : " << ts_packet.in_throttle << " : " << ts_packet.out_steer << " : " << ts_packet.out_throttle << endl;
 		}
 	}

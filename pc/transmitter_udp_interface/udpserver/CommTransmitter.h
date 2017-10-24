@@ -20,8 +20,10 @@ PACKED(
 struct s_transmitter_state_packet{
 	uint8_t in_throttle;
 	uint8_t in_steer;
+	uint16_t in_button;
 	uint8_t out_throttle;
 	uint8_t out_steer;
+	uint16_t battery_voltage_mv;
 	uint32_t CRC;
 };
 );

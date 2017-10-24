@@ -43,9 +43,11 @@ int main(int argc, char *argv[]) {
 	uint8_t new_steer = 0;
 	while (true){
 
-		cout << "get_in_steer: " << myTransmitter.get_in_steer("192.168.0.100") << endl;
-		cout << "get_in_throttle: " << myTransmitter.get_in_throttle("192.168.0.100") << endl;
-		_sleep(5);
+		cout << "|  102 get_in_steer: " << myTransmitter.get_in_steer("192.168.0.102") ;
+		cout << "|  102 get_in_throttle: " << myTransmitter.get_in_throttle("192.168.0.102");
+		cout << "|  103 get_in_steer: " << myTransmitter.get_in_steer("192.168.0.103") ;
+		cout << "|  103 get_in_throttle: " << myTransmitter.get_in_throttle("192.168.0.103") << endl;
+		_sleep(50);
 	}
 
 	return 0;

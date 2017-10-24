@@ -18,6 +18,10 @@
 #define STEERING_CONTROL_PIN	25
 #define BUTTON_SENSE_PIN		17
 
+#define TRANSMITTER_POWER_ENABLE_PIN	13
+
+#define BATTERY_VOLTAGE_SENSE	36
+
 //calibration minimum offset from senter value to begin transmitting data
 #define MINIMAL_ACCEPTED_CALIBRATION_RANGE	500
 

@@ -63,6 +63,10 @@ void TASK_transmitter_hal_run(void *param){
 	//ADC Values read and filtered are put into theese
 	uint16_t in_throttle = 0;
 	uint16_t in_steer = 0;
+
+	//button value
+	uint8_t in_button = 0;
+
 	//normalized to uint8_t
 	uint8_t normalized_in_steer = NORMALIZED_CNT_OUT;
 	uint8_t normalized_in_throttle = NORMALIZED_CNT_OUT;
@@ -89,12 +93,23 @@ void TASK_transmitter_hal_run(void *param){
 	pinMode(THROTTLE_CONTROL_PIN, OUTPUT);
 	pinMode(STEERING_CONTROL_PIN, OUTPUT);
 
+	pinMode(BATTERY_VOLTAGE_SENSE, INPUT);
+
+	pinMode(TRANSMITTER_POWER_ENABLE_PIN, OUTPUT);
+	digitalWrite(TRANSMITTER_POWER_ENABLE_PIN, 0);
+
 	//just send the defined mid-level to both dacs until they are calibrated
 	dacWrite(STEERING_CONTROL_PIN, STEER_CNT_OUT);
 	dacWrite(THROTTLE_CONTROL_PIN, THROTTLE_CNT_OUT);
 
-	//wait 3 seconds for transmitter to adapt the sent mid-levels
-	vTaskDelay(portTICK_PERIOD_MS * 3000);
+	//wait for output settling (much too long, but very safe)
+	vTaskDelay(portTICK_PERIOD_MS * 1000);
+
+	//enable transmitter
+	digitalWrite(TRANSMITTER_POWER_ENABLE_PIN, 1);
+
+	//wait 2 seconds for transmitter to adapt the sent mid-levels
+	vTaskDelay(portTICK_PERIOD_MS * 2000);
 
 	//start reading input values
 	in_throttle = analogRead(THROTTLE_SENSE_PIN);
@@ -123,6 +138,9 @@ void TASK_transmitter_hal_run(void *param){
 		//first read live values, filter them by FILTER_FRACTION
 		in_throttle = in_throttle + (((double)analogRead(THROTTLE_SENSE_PIN) - (double)in_throttle) / FILTER_FRACTION);
 		in_steer = in_steer + (((double)analogRead(STEERING_SENSE_PIN) - (double)in_steer) / FILTER_FRACTION);
+
+		//read button state as boolean
+		in_button = digitalRead(BUTTON_SENSE_PIN) != 0;
 
 		//continous calibration
 			if (in_throttle < min_throttle){
@@ -196,15 +214,16 @@ void TASK_transmitter_hal_run(void *param){
 
 		if (last_millis + 1000 < millis()){
 			last_millis = millis();
-			printf("in_steer: %d;in_throttle %d;out_steer: %d; out_throttle: %d\r\n", transmitter_state.in_steer, transmitter_state.in_throttle, transmitter_state.out_steer, transmitter_state.out_throttle);
+			//transform ADC reading to millivolt
+			transmitter_state.battery_voltage = (3.3 / 4.096) * 2 * analogRead(BATTERY_VOLTAGE_SENSE);
+			//printf("in_steer: %d;in_throttle %d;out_steer: %d; out_throttle: %d\r\n", transmitter_state.in_steer, transmitter_state.in_throttle, transmitter_state.out_steer, transmitter_state.out_throttle);
 		}
 
 
 		dacWrite(STEERING_CONTROL_PIN, transmitter_state.out_steer);
 		dacWrite(THROTTLE_CONTROL_PIN, transmitter_state.out_throttle);
 
-		//release task focus for scheduler, delay for 1ms
-		vTaskDelay(portTICK_PERIOD_MS);
+			vTaskDelay(portTICK_PERIOD_MS);
 
 	}
 	//unreachable!

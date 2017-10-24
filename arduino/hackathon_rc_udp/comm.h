@@ -15,7 +15,7 @@ struct s_transmitter_override{
 	uint64_t millis_last_update;
 	uint32_t CRC;
 	uint8_t ready;
-};
+} __attribute__((packed));
 
 struct s_transmitter_control_packet{
 	uint8_t out_throttle;
